@@ -1,44 +1,47 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_pymongo import PyMongo
+import config 
+from bson.objectid import ObjectId
 
 app = Flask(__name__)
 
-#MongoDB configuration
-# ✅ MongoDB Configuration
-app.config["MONGO_URI"] = "mongodb://localhost:27017/mydatabase"
-mongo = PyMongo(app)
+mongo = PyMongo(app, uri=config.MONGO_URI)
 
+# ✅ Ensure db is initialized correctly
+if mongo.db is None:
+    raise RuntimeError("MongoDB connection failed!")
 
-# ✅ Drinks Collection in MongoDB
-drinks_collection = mongo.db.drinks
+# ✅ Define collection correctly AFTER initializing mongo
+drinks_collection = mongo.db["drinks"]  # Access collection safely
+
 
 @app.route('/')
 def index():
     return "Hello, World!"
 
-@app.route('/drinks') #get all drinks
+# ✅ Get all drinks
+@app.route('/drinks', methods=['GET'])
 def get_all_drinks():
-    #we need to fist add all the drinks into the list
-    drinks = list(drinks.collection.find({}, {"_id": 0})) # Convert cursor to list and exclude _id 
+    drinks = list(drinks_collection.find({}, {"_id": 0}))  # Convert cursor to list and exclude _id
     return jsonify({"drinks": drinks})
 
 
 # ✅ Get a single drink by ID
 @app.route('/drinks/<id>', methods=['GET'])
-def get_drink(drink_id):
+def get_drink(id):
     try:
-        drink = drinks_collection.find_one({"_id": ObjectId(drink_id)}, {"_id": 0})
+        drink = drinks_collection.find_one({"_id": ObjectId(id)}, {"_id": 0})
         if drink:
             return jsonify({"drink": drink})
         return jsonify({"error": "Drink not found"}), 404
-    except Exception as e:
+    except Exception:
         return jsonify({"error": "Invalid ID format"}), 400
-        
+
 
 # ✅ Add a new drink
 @app.route('/add_drink', methods=['POST'])
 def add_drink():
-    data.request.json()
+    data = request.get_json()
     if "name" not in data or "description" not in data:
         return jsonify({"error": "Name and description are required"}), 400
     
@@ -50,7 +53,6 @@ def add_drink():
     return jsonify({"message": "Drink added!", "id": str(drink_id)})
 
 
-
 # ✅ Delete all drinks
 @app.route('/delete_all_drinks', methods=['DELETE'])
 def delete_all_drinks():
@@ -58,6 +60,4 @@ def delete_all_drinks():
     return jsonify({"message": "All drinks deleted!"})
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
